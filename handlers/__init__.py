@@ -53,7 +53,12 @@ from .sources import (
     back_to_sources_callback,
     add_keywords_yes_callback,
     add_keywords_skip_callback,
-    process_keywords_input
+    process_keywords_input,
+    criteria_views_input,
+    criteria_reactions_input,
+    media_filter_callback,
+    duration_callback,
+    remove_text_callback
 )
 from .targets import (
     add_target_start,
