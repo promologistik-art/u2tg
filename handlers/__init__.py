@@ -50,7 +50,10 @@ from .sources import (
     delete_source_callback,
     confirm_delete_source_callback,
     cancel_delete_source_callback,
-    back_to_sources_callback
+    back_to_sources_callback,
+    add_keywords_yes_callback,
+    add_keywords_skip_callback,
+    process_keywords_input
 )
 from .targets import (
     add_target_start,
