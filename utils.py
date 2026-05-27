@@ -61,6 +61,24 @@ def extract_youtube_channel_username(text: str) -> Optional[str]:
     return None
 
 
+def extract_video_id_from_url(url: str) -> Optional[str]:
+    """
+    Извлекает ID видео из ссылки на YouTube.
+    """
+    patterns = [
+        r'(?:https?://)?(?:www\.)?youtube\.com/watch\?v=([a-zA-Z0-9_-]{11})',
+        r'(?:https?://)?(?:www\.)?youtu\.be/([a-zA-Z0-9_-]{11})',
+        r'(?:https?://)?(?:www\.)?youtube\.com/embed/([a-zA-Z0-9_-]{11})',
+        r'(?:https?://)?(?:www\.)?youtube\.com/v/([a-zA-Z0-9_-]{11})',
+        r'(?:https?://)?(?:www\.)?youtube\.com/shorts/([a-zA-Z0-9_-]{11})'
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, url)
+        if match:
+            return match.group(1)
+    return None
+
+
 def calculate_score(post: dict, criteria: dict, post_time: datetime = None) -> Tuple[int, bool]:
     """Рассчитывает рейтинг поста на основе критериев."""
     views = post.get("views", 0)
