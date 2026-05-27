@@ -1,107 +1,97 @@
 import logging
-import re
+from io import BytesIO
 from telegram import Update
 from telegram.ext import ContextTypes
-from bs4 import BeautifulSoup
-from scrapers import TelegramScraper
+from scrapers import YouTubeScraper
 from utils import format_number
 
 logger = logging.getLogger(__name__)
 
 
 async def test_scraper(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Тестирует парсер YouTube."""
     if not context.args:
-        await update.message.reply_text("ℹ️ /test [username]\nПример: /test durov")
+        await update.message.reply_text(
+            "ℹ️ /test [channel_id | video_url | search_query]\n"
+            "Примеры:\n"
+            "/test UCxxxxx — канал\n"
+            "/test https://youtube.com/watch?v=xxxxx — видео\n"
+            "/test как приготовить пиццу — поиск"
+        )
         return
     
-    raw = context.args[0]
-    username = raw.replace("@", "").replace("https://t.me/", "").replace("http://t.me/", "").replace("t.me/", "").strip("/")
+    query = context.args[0]
+    msg = await update.message.reply_text(f"🔍 Тестирую YouTube: {query[:50]}...")
     
-    msg = await update.message.reply_text(f"🔍 Тестирую @{username}...")
-    
-    async with TelegramScraper() as scraper:
-        info = await scraper.get_channel_info(username)
-        if not info:
-            await msg.edit_text(f"❌ Канал @{username} не найден")
-            return
+    async with YouTubeScraper() as scraper:
+        videos = []
         
-        posts = await scraper.get_posts(username, limit=5)
+        # Пробуем как URL видео
+        video = await scraper.get_video_by_url(query)
+        if video:
+            videos = [video]
         
-        if posts:
-            text = f"📨 @{username}\nНайдено: {len(posts)}\n\n"
-            for i, p in enumerate(posts[:5], 1):
-                text += f"{i}. 👁 {format_number(p['views'])} | ❤️ {format_number(p['reactions'])}\n"
-                text += f"   📎 {'📷' if p.get('media_type') == 'photo' else '🎬' if p.get('media_type') == 'video' else '📝'}\n"
-                if p.get('text'):
-                    text += f"   {p['text'][:50]}...\n"
-                text += "\n"
+        # Пробуем как channel_id
+        if not videos:
+            channel_id = scraper._extract_channel_id(query)
+            if channel_id:
+                videos = await scraper.get_videos_from_channel(channel_id, limit=5)
+        
+        # Пробуем как поисковый запрос
+        if not videos:
+            videos = await scraper.search_videos(query, limit=5)
+        
+        if videos:
+            text = f"📨 Найдено: {len(videos)}\n\n"
+            for i, v in enumerate(videos[:5], 1):
+                text += f"{i}. <b>{v['title'][:50]}...</b>\n"
+                text += f"   👁 {format_number(v['views'])} | ❤️ {format_number(v['likes'])} | 💬 {format_number(v['comments'])}\n"
+                text += f"   📹 {v['url']}\n"
+                text += f"   🕐 {v['duration_seconds']} сек\n\n"
+            await msg.edit_text(text, parse_mode="HTML")
         else:
-            text = f"❌ Посты не найдены"
-    
-    await msg.edit_text(text)
+            await msg.edit_text("❌ Видео не найдены")
 
 
 async def debug_reactions(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Показывает детальную информацию о видео (аналог реакций для YouTube)."""
     if not context.args:
-        await update.message.reply_text("ℹ️ /debug_reactions [username]")
+        await update.message.reply_text("ℹ️ /debug_reactions [video_url]\nПример: /debug_reactions https://youtube.com/watch?v=xxxxx")
         return
     
-    username = context.args[0].replace("@", "").strip("/")
-    msg = await update.message.reply_text(f"🔍 Анализирую реакции @{username}...")
+    url = context.args[0]
+    msg = await update.message.reply_text(f"🔍 Анализирую видео: {url[:50]}...")
     
-    async with TelegramScraper() as scraper:
-        url = f"https://t.me/s/{username}"
-        html = await scraper._fetch(url)
+    async with YouTubeScraper() as scraper:
+        video = await scraper.get_video_by_url(url)
         
-        if not html:
-            await msg.edit_text("❌ Не удалось загрузить страницу")
+        if not video:
+            await msg.edit_text("❌ Видео не найдено")
             return
         
-        soup = BeautifulSoup(html, "lxml")
-        messages = soup.find_all("div", class_="tgme_widget_message")[:3]
-        
-        if not messages:
-            await msg.edit_text("❌ Сообщения не найдены")
-            return
-        
-        # Отправляем результат в файле, чтобы избежать проблем с HTML
+        # Формируем отчёт
         result_lines = []
-        for i, msg_div in enumerate(messages, 1):
-            reactions_div = msg_div.find("div", class_="tgme_widget_message_reactions")
-            
-            result_lines.append(f"=== Пост {i} ===")
-            
-            if reactions_div:
-                reactions_html = str(reactions_div)
-                result_lines.append(f"Блок реакций: {reactions_html[:500]}")
-                
-                spans = reactions_div.find_all("span")
-                for span in spans[:10]:
-                    classes = span.get("class", [])
-                    text = span.get_text(strip=True)
-                    result_lines.append(f"  Span: classes={classes}, text='{text}'")
-                
-                reactions_text = reactions_div.get_text()
-                emoji_pattern = r'([^\w\s\d]{1,3})\s*(\d{1,6})'
-                matches = re.findall(emoji_pattern, reactions_text)
-                if matches:
-                    result_lines.append(f"  Эмодзи+числа: {matches}")
-            else:
-                result_lines.append(f"Блок реакций НЕ НАЙДЕН")
-                result_lines.append(f"HTML сообщения: {str(msg_div)[:300]}")
-            
-            result_lines.append("")
+        result_lines.append(f"=== Детали видео ===")
+        result_lines.append(f"Название: {video['title']}")
+        result_lines.append(f"Канал: {video['channel_title']} ({video['channel_id']})")
+        result_lines.append(f"Просмотры: {format_number(video['views'])}")
+        result_lines.append(f"Лайки: {format_number(video['likes'])}")
+        result_lines.append(f"Комментарии: {format_number(video['comments'])}")
+        result_lines.append(f"Длительность: {video['duration_seconds']} сек")
+        result_lines.append(f"Шортс: {'✅' if video['is_shorts'] else '❌'}")
+        result_lines.append(f"Опубликовано: {video['published_at']}")
+        result_lines.append(f"Ссылка: {video['url']}")
+        result_lines.append(f"Превью: {video['thumbnail_url']}")
         
         full_result = "\n".join(result_lines)
         
         # Отправляем как файл
-        from io import BytesIO
         result_file = BytesIO(full_result.encode('utf-8'))
-        result_file.name = f"reactions_{username}.txt"
+        result_file.name = f"video_{video['video_id']}.txt"
         
         await msg.delete()
         await update.message.reply_document(
             document=result_file,
-            filename=f"reactions_{username}.txt",
-            caption=f"🔍 Результат анализа @{username}"
+            filename=f"video_{video['video_id']}.txt",
+            caption=f"🔍 Детальный анализ видео"
         )
