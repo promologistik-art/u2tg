@@ -18,20 +18,17 @@ from handlers import (
     start, help_command, cancel,
     my_projects, projects_callback, project_menu_callback, handle_project_name,
     back_to_projects_callback,
-    add_source_start, add_source_username, add_source_criteria,
-    criteria_views_input, criteria_reactions_input,
-    media_filter_callback, duration_callback, remove_text_callback,
+    add_source_start,
+    youtube_source_type_callback,
+    youtube_channel_id_input,
+    youtube_link_input,
+    youtube_search_query_input,
+    youtube_country_callback,
+    youtube_category_callback,
+    youtube_content_type_callback,
     my_sources, edit_source_callback, delete_source_callback,
     confirm_delete_source_callback, cancel_delete_source_callback,
-    edit_source_start, edit_views_input, edit_reactions_input,
-    edit_media_filter_callback, edit_duration_callback, edit_remove_text_callback,
-    edit_exclude_phrases_input, edit_keywords_input,
-    add_keywords_yes_callback, add_keywords_skip_callback, process_keywords_input,
     back_to_sources_callback,
-    source_type_callback,
-    youtube_query_input, youtube_category_callback, youtube_region_callback,
-    youtube_criteria_callback, youtube_views_input, youtube_likes_input,
-    youtube_comments_input,
     add_target_start, add_target_forward, add_target_continue_callback,
     my_targets, delete_target_callback,
     set_interval_start, set_interval_callback,
@@ -55,8 +52,14 @@ from handlers import (
     AWAITING_MEDIA_FILTER, AWAITING_REMOVE_TEXT,
     AWAITING_EDIT_VIEWS, AWAITING_EDIT_REACTIONS, AWAITING_EDIT_EXCLUDE_PHRASES,
     AWAITING_BROADCAST_MESSAGE, AWAITING_KEYWORDS, AWAITING_EDIT_KEYWORDS,
-    AWAITING_SOURCE_TYPE, AWAITING_YOUTUBE_QUERY,
-    AWAITING_YOUTUBE_CATEGORY, AWAITING_YOUTUBE_REGION, AWAITING_YOUTUBE_CRITERIA
+    # YouTube states
+    AWAITING_YOUTUBE_SOURCE_TYPE,
+    AWAITING_YOUTUBE_CHANNEL_ID,
+    AWAITING_YOUTUBE_LINK,
+    AWAITING_YOUTUBE_SEARCH_QUERY,
+    AWAITING_YOUTUBE_COUNTRY,
+    AWAITING_YOUTUBE_CATEGORY,
+    AWAITING_YOUTUBE_CONTENT_TYPE
 )
 
 from posters import TelegramPoster
@@ -139,10 +142,10 @@ async def main():
     app.add_handler(CallbackQueryHandler(back_to_sources_callback, pattern="^back_to_sources$"))
     
     # YouTube обработчики
-    app.add_handler(CallbackQueryHandler(source_type_callback, pattern="^source_type_"))
-    app.add_handler(CallbackQueryHandler(youtube_category_callback, pattern="^youtube_cat_"))
-    app.add_handler(CallbackQueryHandler(youtube_region_callback, pattern="^youtube_region_"))
-    app.add_handler(CallbackQueryHandler(youtube_criteria_callback, pattern="^youtube_criteria_"))
+    app.add_handler(CallbackQueryHandler(youtube_source_type_callback, pattern="^youtube_type_"))
+    app.add_handler(CallbackQueryHandler(youtube_country_callback, pattern="^country_"))
+    app.add_handler(CallbackQueryHandler(youtube_category_callback, pattern="^category_"))
+    app.add_handler(CallbackQueryHandler(youtube_content_type_callback, pattern="^content_"))
     
     # Обработчики для целей
     app.add_handler(CallbackQueryHandler(delete_target_callback, pattern="^del_target_"))
@@ -156,59 +159,56 @@ async def main():
     add_source_conv = ConversationHandler(
         entry_points=[CommandHandler("add_source", add_source_start)],
         states={
-            AWAITING_SOURCE_TYPE: [
-                CallbackQueryHandler(source_type_callback, pattern="^source_type_"),
+            AWAITING_YOUTUBE_SOURCE_TYPE: [
+                CallbackQueryHandler(youtube_source_type_callback, pattern="^youtube_type_"),
                 CommandHandler("start", start),
                 CommandHandler("help", help_command),
                 CommandHandler("cancel", cancel),
             ],
-            AWAITING_YOUTUBE_QUERY: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, youtube_query_input),
+            AWAITING_YOUTUBE_CHANNEL_ID: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, youtube_channel_id_input),
+                CommandHandler("start", start),
+                CommandHandler("help", help_command),
+                CommandHandler("cancel", cancel),
+            ],
+            AWAITING_YOUTUBE_LINK: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, youtube_link_input),
+                CommandHandler("start", start),
+                CommandHandler("help", help_command),
+                CommandHandler("cancel", cancel),
+            ],
+            AWAITING_YOUTUBE_SEARCH_QUERY: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, youtube_search_query_input),
+                CommandHandler("start", start),
+                CommandHandler("help", help_command),
+                CommandHandler("cancel", cancel),
+            ],
+            AWAITING_YOUTUBE_COUNTRY: [
+                CallbackQueryHandler(youtube_country_callback, pattern="^country_"),
                 CommandHandler("start", start),
                 CommandHandler("help", help_command),
                 CommandHandler("cancel", cancel),
             ],
             AWAITING_YOUTUBE_CATEGORY: [
-                CallbackQueryHandler(youtube_category_callback, pattern="^youtube_cat_"),
+                CallbackQueryHandler(youtube_category_callback, pattern="^category_"),
                 CommandHandler("start", start),
                 CommandHandler("help", help_command),
                 CommandHandler("cancel", cancel),
             ],
-            AWAITING_YOUTUBE_REGION: [
-                CallbackQueryHandler(youtube_region_callback, pattern="^youtube_region_"),
-                CommandHandler("start", start),
-                CommandHandler("help", help_command),
-                CommandHandler("cancel", cancel),
-            ],
-            AWAITING_YOUTUBE_CRITERIA: [
-                CallbackQueryHandler(youtube_criteria_callback, pattern="^youtube_criteria_"),
-                CommandHandler("start", start),
-                CommandHandler("help", help_command),
-                CommandHandler("cancel", cancel),
-            ],
-            AWAITING_SOURCE_USERNAME: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, add_source_username),
-                CommandHandler("start", start),
-                CommandHandler("help", help_command),
-                CommandHandler("cancel", cancel),
-            ],
-            AWAITING_CRITERIA: [
-                CallbackQueryHandler(add_source_criteria, pattern="^criteria_"),
+            AWAITING_YOUTUBE_CONTENT_TYPE: [
+                CallbackQueryHandler(youtube_content_type_callback, pattern="^content_"),
                 CommandHandler("start", start),
                 CommandHandler("help", help_command),
                 CommandHandler("cancel", cancel),
             ],
             AWAITING_VIEWS: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, criteria_views_input),
-                MessageHandler(filters.TEXT & ~filters.COMMAND, youtube_views_input),
                 CommandHandler("start", start),
                 CommandHandler("help", help_command),
                 CommandHandler("cancel", cancel),
             ],
             AWAITING_REACTIONS: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, criteria_reactions_input),
-                MessageHandler(filters.TEXT & ~filters.COMMAND, youtube_likes_input),
-                MessageHandler(filters.TEXT & ~filters.COMMAND, youtube_comments_input),
                 CommandHandler("start", start),
                 CommandHandler("help", help_command),
                 CommandHandler("cancel", cancel),
@@ -240,7 +240,7 @@ async def main():
     )
     
     edit_source_conv = ConversationHandler(
-        entry_points=[CallbackQueryHandler(edit_source_start, pattern="^edit_(criteria|media|text|phrases|clear_phrases|keywords|youtube_criteria)_")],
+        entry_points=[CallbackQueryHandler(edit_source_start, pattern="^edit_(criteria|media|text|phrases|clear_phrases|keywords)_")],
         states={
             AWAITING_EDIT_VIEWS: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, edit_views_input),
