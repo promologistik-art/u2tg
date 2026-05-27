@@ -621,59 +621,6 @@ async def remove_text_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     return AWAITING_KEYWORDS
 
 
-async def add_link_source_direct(update: Update, context: ContextTypes.DEFAULT_TYPE, video: dict):
-    """Добавляет источник-ссылку сразу в очередь (без критериев)."""
-    temp = context.user_data.get('temp_source')
-    
-    async with AsyncSessionLocal() as session:
-        channel = SourceChannel(
-            project_id=temp['project_id'],
-            name=temp['name'],
-            source_type='link',
-            youtube_link_url=temp['youtube_link_url'],
-            criteria={},
-            media_filter='all',
-            remove_original_text=False,
-            max_age_hours=24
-        )
-        session.add(channel)
-        await session.commit()
-        context.user_data['temp_source_id'] = channel.id
-    
-    # Добавляем в очередь
-    poster = context.application.bot_data.get('poster')
-    if poster:
-        from datetime import datetime, timedelta
-        post_data = {
-            'url': video['url'],
-            'title': video['title'],
-            'description': video.get('description', ''),
-            'views': video.get('views', 0),
-            'likes': video.get('likes', 0),
-            'thumbnail_url': video.get('thumbnail_url'),
-            'source_name': temp['name']
-        }
-        await poster.add_to_queue(
-            project_id=temp['project_id'],
-            target_channel_id=await get_project_target(temp['project_id']),
-            post_data=post_data,
-            scheduled_time=datetime.utcnow() + timedelta(minutes=5)
-        )
-    
-    await update.message.reply_text(
-        f"✅ Источник-ссылка добавлен!\n"
-        f"📹 {video['title'][:50]}...\n"
-        f"⏰ Добавлен в очередь публикации."
-    )
-    
-    # Очистка временных данных
-    context.user_data.pop('temp_source', None)
-    context.user_data.pop('temp_project_id', None)
-    context.user_data.pop('temp_project_name', None)
-    
-    return ConversationHandler.END
-
-
 async def add_keywords_yes_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
