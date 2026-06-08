@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 YouTube Content Bot
-Version: 1.0.05 (26.05.2026)
+Version: 1.0.05 (08/06/26)
 """
 
 import asyncio
